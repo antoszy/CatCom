@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# VIM files
+*.swo
+*.swp
+
+# Records
+rpi/records*
