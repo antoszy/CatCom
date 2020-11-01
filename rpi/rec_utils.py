@@ -28,8 +28,8 @@ class AudioRecorder:
         self.stream.stop_stream()
         self.stream.close()
         self.p.terminate()
+        print("Audio stream closed due to exception:")
         print(f"{exception_type} \n {exception_value} \n {exception_traceback}")
-        print("Audio stream closed")
 
     def read_chank(self, chank_size=1024):
         data = self.stream.read(chank_size)
