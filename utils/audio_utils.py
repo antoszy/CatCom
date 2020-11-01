@@ -1,3 +1,4 @@
+from pathlib import Path
 from scipy import signal
 from scipy.fft import fftshift
 import matplotlib.pyplot as plt
@@ -15,7 +16,7 @@ def draw_spectrogram(data, fs):
     plt.colorbar()
 
 
-def check_threshold(record, norm_tsh=0.75):
+def check_threshold(record, norm_tsh=0.82):
     tsh = np.iinfo(record.dtype).max * norm_tsh
     return tsh <= max(record)
 
@@ -28,13 +29,13 @@ def get_initial_file_no(directory, file_name_base):
     return max(num_gen) + 1
 
 
-def save_wav(file_path, record, sampe_rate=16000):
+def save_wav(file_path, record, sample_rate=16000):
     frames = record.tostring()
     wf = wave.open(file_path, 'wb')
     wf.setnchannels(1)
-    wf.setsampwidth(p.get_sample_size(p.get_format_from_width(2)))
+    wf.setsampwidth(2)
     wf.setframerate(sample_rate)
-    wf.writeframes(b''.join(frames))
+    wf.writeframes(frames)
     wf.close()
     print(f"Record saved as {file_path}")
 
