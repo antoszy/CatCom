@@ -32,7 +32,7 @@ class AudioRecorder:
         print(f"{exception_type} \n {exception_value} \n {exception_traceback}")
 
     def read_chank(self, chank_size=1024):
-        data = self.stream.read(chank_size)
+        data = self.stream.read(chank_size, exception_on_overflow = False)
         data_arr = np.fromstring(data,dtype=np.int16)
         return [data_arr[start_idx::self.channels] for start_idx in range(0, self.channels)]
 

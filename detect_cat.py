@@ -5,10 +5,12 @@ import utils.audio_utils as au
 import numpy as np
 from detector.detector import Detector
 import pickle
+import sys
 
 DIRECTORY = "records_detector"
 MODEL_DIR = "models/svc.pickle"
-REC_LENGTH = 50
+REC_LENGTH = 6
+LOUD_TSH = 0.85
 
 
 class RecSaver():
@@ -36,12 +38,14 @@ if __name__ == "__main__":
     with rec_utils.AudioRecorder() as audio_rec:
         while(1):
             audio_chank = audio_rec.read_chank()[1]
-            if (au.check_threshold(audio_chank, norm_tsh=0.50)):
-                print("Loud audio detected at:")
-                print(datetime.now().time())
+            if (au.check_threshold(audio_chank, norm_tsh=LOUD_TSH)):
                 cat_detect = detector.run_detection(audio_chank)
-                print(f"Effect of running detector = {cat_detect}")
+                print(f"Loud audio detected at: {datetime.now().time()} " +
+                      f"Detector output = {cat_detect[0]} " +
+                      f"Max audio = {max(audio_chank)/np.iinfo(audio_chank.dtype).max}")
                 if cat_detect:
+                    sys.stdout.write('\a')
+                    sys.stdout.flush()
                     record = np.array(audio_chank, dtype=np.int16)
                     for sample_num in range(0, REC_LENGTH):
                         audio_chank = audio_rec.read_chank()[1]
