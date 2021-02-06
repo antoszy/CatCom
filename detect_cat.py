@@ -44,11 +44,12 @@ if __name__ == "__main__":
                       f"Detector output = {cat_detect[0]} " +
                       f"Max audio = {max(audio_chank)/np.iinfo(audio_chank.dtype).max}")
                 if cat_detect:
-                    sys.stdout.write('\a')
+                    #sys.stdout.write('\a')
                     sys.stdout.flush()
                     record = np.array(audio_chank, dtype=np.int16)
                     for sample_num in range(0, REC_LENGTH):
                         audio_chank = audio_rec.read_chank()[1]
                         record = np.append(record, audio_chank)
                     rec_saver.save(record)
+                    au.play_cat_sound()
 

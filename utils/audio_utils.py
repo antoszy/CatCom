@@ -4,6 +4,7 @@ from scipy.fft import fftshift
 import matplotlib.pyplot as plt
 import numpy as np
 import wave
+import simpleaudio as sa
 
 
 def draw_spectrogram(data, fs):
@@ -37,3 +38,15 @@ def save_wav(file_path, record, sample_rate=16000):
     wf.writeframes(frames)
     wf.close()
     print(f"Record saved as {file_path}")
+
+def play_cat_sound():
+    filename = 'records_detector/rec_a00515.wav'
+    wave_obj = sa.WaveObject.from_wave_file(filename)
+    play_obj = wave_obj.play()
+    play_obj.wait_done()  # Wait until sound has finished playing
+
+def play_a_sound():
+    filename = 'sounds/a.wav'
+    wave_obj = sa.WaveObject.from_wave_file(filename)
+    play_obj = wave_obj.play()
+    play_obj.wait_done()  # Wait until sound has finished playing
