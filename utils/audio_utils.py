@@ -1,10 +1,28 @@
 from pathlib import Path
+import os
 from scipy import signal
 from scipy.fft import fftshift
 import matplotlib.pyplot as plt
 import numpy as np
 import wave
 import simpleaudio as sa
+
+class RecSaver():
+    def __init__(self, directory):
+        if not os.path.exists(directory):
+            print(f"RecSaver: Creating directory {directory}")
+            os.makedirs(directory)
+            self.file_counter = 0
+        else:
+            self.file_counter = get_initial_file_no(directory, "rec_a")
+        self.directory = directory
+
+    def save(self, record):
+        save_wav(self.directory+"/rec_a"+str(self.file_counter).zfill(5)+".wav",
+                 record,
+                 16000)
+        # TODO: magic number above
+        self.file_counter += 1
 
 
 def draw_spectrogram(data, fs):
@@ -39,14 +57,23 @@ def save_wav(file_path, record, sample_rate=16000):
     wf.close()
     print(f"Record saved as {file_path}")
 
+
 def play_cat_sound():
     filename = 'records_detector/rec_a00515.wav'
     wave_obj = sa.WaveObject.from_wave_file(filename)
     play_obj = wave_obj.play()
     play_obj.wait_done()  # Wait until sound has finished playing
 
+
 def play_a_sound():
     filename = 'sounds/a.wav'
+    wave_obj = sa.WaveObject.from_wave_file(filename)
+    play_obj = wave_obj.play()
+    play_obj.wait_done()  # Wait until sound has finished playing
+
+
+def play_d_sound():
+    filename = 'sounds/d.wav'
     wave_obj = sa.WaveObject.from_wave_file(filename)
     play_obj = wave_obj.play()
     play_obj.wait_done()  # Wait until sound has finished playing
