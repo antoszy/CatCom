@@ -7,6 +7,7 @@ import numpy as np
 import wave
 import simpleaudio as sa
 
+
 class RecSaver():
     def __init__(self, directory):
         if not os.path.exists(directory):

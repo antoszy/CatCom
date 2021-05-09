@@ -43,7 +43,7 @@ class StateRunning(State, ExitStack):
 
     def __del__(self):
         print("Exiting running state")
-        super().__exit__()
+        self.audio_rec.stop_stream()
 
     def run(self):
         audio_chunk = self.audio_rec.read_chank()[1]
