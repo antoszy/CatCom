@@ -6,6 +6,7 @@ WORKDIR /notebooks
 
 # Install additional Python packages using pip
 RUN pip install pandas tensorflow_io tensorflow_hub
+RUN pip install fastapi uvicorn
 
 # Expose the Jupyter Notebook port
 EXPOSE 8080

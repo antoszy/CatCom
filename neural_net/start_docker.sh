@@ -8,3 +8,6 @@
 
 docker run --gpus all -it --rm -p 8080:8080 -v "$(pwd)":/notebooks -v /data:/data tensorall  \
     bash -c "cd /notebooks && jupyter notebook --ip=0.0.0.0 --port=8080 --allow-root"
+
+# docker run --gpus all -it --rm -p 8080:8080 -v "$(pwd)":/notebooks -v /data:/data tensorall  \
+#     bash
