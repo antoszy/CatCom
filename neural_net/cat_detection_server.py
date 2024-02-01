@@ -1,4 +1,4 @@
-from model import CatDetector
+from model import CatDetector, load_wav_16k_mono_into_tensor
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 import aiofiles
@@ -14,17 +14,17 @@ class CatDetectorAPI:
         if not file.filename.endswith('.wav'):
             return JSONResponse(content={"error": "Invalid file format"}, status_code=400)
 
-        async with aiofiles.tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            # Async write file to temp directory
-            async for chunk in file.file:
-                await tmp.write(chunk)
-            tmp_name = tmp.name
+        # Read the uploaded file into memory
+        contents = await file.read()
 
-        is_cat_meowing = await self.cat_detector.detect_cat(tmp_name)
+        # Convert the file contents to a tensor and resample
+        wav_tensor = load_wav_16k_mono_into_tensor(contents)
+
+        # Use the tensor to detect cat meows
+        is_cat_meowing = await self.cat_detector.detect_cat(wav_tensor)
         
-        os.remove(tmp_name)
-
         return {"cat_meowing_detected": is_cat_meowing}
+
 
 # Initialize FastAPI app
 app = FastAPI()
