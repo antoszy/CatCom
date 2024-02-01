@@ -1,5 +1,6 @@
 # Use the base image with TensorFlow, GPU support, and Jupyter Notebook
-FROM tensorflow/tensorflow:2.13.0-gpu-jupyter
+# FROM tensorflow/tensorflow:2.13.0-gpu-jupyter
+FROM tensorflow/tensorflow:2.13.0
 
 # Set the working directory
 WORKDIR /notebooks
