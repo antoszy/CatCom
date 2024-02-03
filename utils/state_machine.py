@@ -53,19 +53,23 @@ class StateRunning(State, ExitStack):
             print(f"Loud audio detected at: {datetime.now().time()} " +
                   f"Detector output = {cat_detect[0]} " +
                   f"Max audio = {max(audio_chunk) / np.iinfo(audio_chunk.dtype).max}")
-            if cat_detect or True:
+            if cat_detect:
                 # sys.stdout.write('\a')
                 sys.stdout.flush()
                 record = np.array(audio_chunk, dtype=np.int16)
                 for sample_num in range(0, REC_LENGTH):
                     audio_chunk = self.audio_rec.read_chank()[1]
                     record = np.append(record, audio_chunk)
+                # Save temp record for sending to server
                 rec_path = self.ctx["rec_saver"].save(record, REC_FILE_NAME)
                 detector_server_response = self.ctx["cat_detector_client"].send_file(rec_path)
-                print(f"Detection server cat detected: {detector_server_response.get('cat_detected')}")
-                if detector_server_response.get("cat_detected"):
+                print(f"Detection server response: {detector_server_response}")
+                if detector_server_response["cat_meowing_detected"]:
                     print("Cat detected")
                     au.play_cat_sound()
+                    # Save permanent record for verification by hand
+                    rec_path = self.ctx["rec_saver"].save(record)
+
 
     def change(self, ctx):
         return StateStandby(ctx)

@@ -65,7 +65,7 @@ def save_wav(file_path, record, sample_rate=16000):
 
 
 def play_cat_sound():
-    filename = 'records_detector/rec_a00515.wav'
+    filename = 'records_detector/catmad.wav'
     wave_obj = sa.WaveObject.from_wave_file(filename)
     play_obj = wave_obj.play()
     play_obj.wait_done()  # Wait until sound has finished playing
