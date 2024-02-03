@@ -62,6 +62,7 @@ class StateRunning(State, ExitStack):
                     record = np.append(record, audio_chunk)
                 rec_path = self.ctx["rec_saver"].save(record, REC_FILE_NAME)
                 detector_server_response = self.ctx["cat_detector_client"].send_file(rec_path)
+                print(f"Detection server cat detected: {detector_server_response.get('cat_detected')}")
                 if detector_server_response.get("cat_detected"):
                     print("Cat detected")
                     au.play_cat_sound()
