@@ -7,6 +7,7 @@ import sys
 
 LOUD_TSH = 0.85
 REC_LENGTH = 6
+REC_FILE_NAME = "tmp.wav" 
 
 
 class State:
@@ -59,19 +60,23 @@ class StateRunning(State, ExitStack):
                 for sample_num in range(0, REC_LENGTH):
                     audio_chunk = self.audio_rec.read_chank()[1]
                     record = np.append(record, audio_chunk)
-                self.ctx["rec_saver"].save(record)
-                au.play_cat_sound()
+                self.ctx["rec_saver"].save(record, REC_FILE_NAME)
+                detector_server_response = self.ctx["cat_detector_client"].send_file(REC_FILE_NAME)
+                if detector_server_response.get("cat_detected"):
+                    print("Cat detected")
+                    au.play_cat_sound()
 
     def change(self, ctx):
         return StateStandby(ctx)
 
 
 class StateMachine:
-    def __init__(self, audio_rec, detector, rec_saver):
+    def __init__(self, audio_rec, detector, rec_saver, cat_detector_client):
         self.context = {
             "audio_rec": audio_rec,
             "detector": detector,
-            "rec_saver": rec_saver
+            "rec_saver": rec_saver,
+            "cat_detector_client": cat_detector_client
         }
         self.currentState = StateStandby(self.context)
 

@@ -18,8 +18,12 @@ class RecSaver():
             self.file_counter = get_initial_file_no(directory, "rec_a")
         self.directory = directory
 
-    def save(self, record):
-        save_wav(self.directory+"/rec_a"+str(self.file_counter).zfill(5)+".wav",
+    def save(self, record, file_name: str = None):
+        if file_name is None:
+            path = self.directory + "/rec_a"+str(self.file_counter).zfill(5)+".wav"
+        else:
+            path = self.directory + "/" + file_name
+        save_wav(path,
                  record,
                  16000)
         # TODO: magic number above
