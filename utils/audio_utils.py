@@ -28,6 +28,7 @@ class RecSaver():
                  16000)
         # TODO: magic number above
         self.file_counter += 1
+        return path
 
 
 def draw_spectrogram(data, fs):
