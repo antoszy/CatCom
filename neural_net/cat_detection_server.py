@@ -22,6 +22,11 @@ class CatDetectorAPI:
 
         # Use the tensor to detect cat meows
         is_cat_meowing = await self.cat_detector.detect_cat(wav_tensor)
+
+        if is_cat_meowing:
+            print("Cat meowing detected")
+        else:
+            print("No cat moewing detected")
         
         return {"cat_meowing_detected": is_cat_meowing}
 
