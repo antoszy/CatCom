@@ -9,5 +9,5 @@
 # docker run --gpus all -it --rm -p 8081:8081 -v "$(pwd)":/notebooks -v /data:/data tensorall  \
 #     bash -c "uvicorn cat_detection_server:app --port 8081 --reload --ssl-keyfile=key.pem --ssl-certfile=cert.pem"
 
-docker run -it --rm -p 8981:8981 -v "$(pwd)":/notebooks -v /data:/data tensorall  \
+docker run --rm -p 8981:8981 -v "$(pwd)":/notebooks -v /data:/data tensorall  \
     bash -c "uvicorn cat_detection_server:app --port 8981 --host 0.0.0.0 --reload"

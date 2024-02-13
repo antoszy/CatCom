@@ -4,7 +4,7 @@
 USER_NAME=$(whoami)
 
 # Get the current script path
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SERVICE_NAME="cat_detector_service"
 SERVICE_PATH="$SCRIPT_PATH/start_server.sh"
