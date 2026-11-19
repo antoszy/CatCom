@@ -17,8 +17,8 @@ from candidate_store import CandidateStore
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("cat_detection_server")
 
-# Every received clip is kept here for labelling; set CATCOM_CANDIDATES_DIR=""
-# to disable.
+# Clips the Pi's SVM let through are kept here for labelling; set
+# CATCOM_CANDIDATES_DIR="" to disable.
 DEFAULT_CANDIDATES_DIR = os.environ.get(
     "CATCOM_CANDIDATES_DIR",
     str(Path(__file__).resolve().parent.parent / "data" / "candidates"))
@@ -32,7 +32,8 @@ def create_app(detector: Optional[Detector] = None,
                candidates: Optional[CandidateStore] = None) -> FastAPI:
     """Build the API. Without ``detector`` the EfficientAT model is loaded at startup.
 
-    ``candidates`` stores every received clip; None disables storing.
+    ``candidates`` stores clips the Pi's SVM let through (svm="1");
+    None disables storing.
     """
     state = {"detector": detector}
 
@@ -66,7 +67,9 @@ def create_app(detector: Optional[Detector] = None,
         logger.info("%s: %.2f s, cat score %.3f -> %s", file.filename,
                     waveform.size / sample_rate, score,
                     "CAT" if is_cat_meowing else "no cat")
-        if candidates is not None:
+        # Only SVM-positive clips are kept: everything louder than the gate
+        # arrives here, mostly background noise not worth the disk space.
+        if candidates is not None and svm == "1":
             try:
                 candidates.save(wav_bytes, score, is_cat_meowing, svm)
             except OSError:
