@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, Optional
 
 import requests
 
@@ -10,12 +10,17 @@ class CatDetectorClient:
         self.url = url
         self.timeout_s = timeout_s
 
-    def send_file(self, file_path: str) -> Optional[dict]:
-        """Return the server's JSON response, or None if the server is unavailable."""
+    def send_file(self, file_path: str,
+                  metadata: Optional[Dict[str, str]] = None) -> Optional[dict]:
+        """Send a WAV file (plus optional form fields) and return the server's JSON response.
+
+        Returns None if the server is unavailable.
+        """
         try:
             with open(file_path, 'rb') as f:
                 files = {'file': (file_path, f, 'audio/wav')}
-                response = requests.post(self.url, files=files, timeout=self.timeout_s)
+                response = requests.post(self.url, files=files, data=metadata or {},
+                                         timeout=self.timeout_s)
             response.raise_for_status()
             return response.json()
         except (requests.RequestException, ValueError) as exc:

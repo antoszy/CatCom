@@ -74,19 +74,23 @@ class StateRunning(State, ExitStack):
             print(f"Loud audio detected at: {datetime.now().time()} " +
                   f"Detector output = {cat_detect[0]} " +
                   f"Max audio = {max(audio_chunk) / np.iinfo(audio_chunk.dtype).max}")
-            if cat_detect:
-                # sys.stdout.write('\a')
-                sys.stdout.flush()
-                record = self._record_with_pre_roll()
-                # Save temp record for sending to server
-                rec_path = self.ctx["rec_saver"].save(record, REC_FILE_NAME)
-                detector_server_response = self.ctx["cat_detector_client"].send_file(rec_path)
-                print(f"Detection server response: {detector_server_response}")
-                if detector_server_response and detector_server_response["cat_meowing_detected"]:
-                    print("Cat detected")
-                    au.play_cat_sound()
-                    # Save permanent record for verification by hand
-                    rec_path = self.ctx["rec_saver"].save(record)
+            svm_says_cat = bool(cat_detect[0])
+            # Every loud event goes to the server, also when the SVM rejects it:
+            # the server stores all clips, so meows the SVM misses can be labelled.
+            # The alarm still requires both the SVM and the server to agree.
+            record = self._record_with_pre_roll()
+            rec_path = self.ctx["rec_saver"].save(record, REC_FILE_NAME)
+            detector_server_response = self.ctx["cat_detector_client"].send_file(
+                rec_path, metadata={"svm": str(int(svm_says_cat))})
+            print(f"Detection server response: {detector_server_response}")
+            sys.stdout.flush()
+            server_says_cat = bool(detector_server_response
+                                   and detector_server_response["cat_meowing_detected"])
+            if svm_says_cat and server_says_cat:
+                print("Cat detected")
+                au.play_cat_sound()
+                # Save permanent record for verification by hand
+                rec_path = self.ctx["rec_saver"].save(record)
 
 
     def change(self, ctx):

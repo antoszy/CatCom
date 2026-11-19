@@ -136,5 +136,6 @@ dmypy.json
 rpi/records*
 
 # Recordings (data, not code); hand-made labels are versioned
-data/*
-!data/labels.csv
+data/**
+!data/**/
+!data/**/labels.csv

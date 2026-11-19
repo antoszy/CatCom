@@ -47,3 +47,27 @@ def test_invalid_audio_is_400_and_skips_model():
 def test_health():
     with TestClient(create_app(FakeDetector((False, 0.0)))) as client:
         assert client.get("/health").json() == {"status": "ok", "model_loaded": True}
+
+
+def test_upload_stores_candidate_with_svm_verdict(tmp_path):
+    from candidate_store import CandidateStore
+
+    store = CandidateStore(tmp_path)
+    app = create_app(FakeDetector((False, 0.2)), candidates=store)
+    with TestClient(app) as client:
+        response = client.post("/upload/", files={"file": ("tmp.wav", wav_bytes(), "audio/wav")},
+                               data={"svm": "0"})
+    assert response.status_code == 200
+    saved = list(tmp_path.glob("cand_*.wav"))
+    assert len(saved) == 1 and saved[0].read_bytes() == wav_bytes()
+    assert "0.2000,0,0" in store.index_path.read_text()
+
+
+def test_storage_failure_does_not_break_detection(tmp_path):
+    class BrokenStore:
+        def save(self, *args):
+            raise OSError("disk full")
+
+    with TestClient(create_app(FakeDetector((True, 0.9)), candidates=BrokenStore())) as client:
+        response = client.post("/upload/", files={"file": ("tmp.wav", wav_bytes(), "audio/wav")})
+    assert response.status_code == 200 and response.json()["cat_meowing_detected"] is True

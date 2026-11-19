@@ -36,7 +36,8 @@ def test_store_rejects_unknown_label(tmp_path):
 
 def test_api_lists_labels_and_saves(recordings, tmp_path):
     labels = tmp_path / "labels.csv"
-    client = TestClient(create_app(recordings, labels, {"rec_a00001.wav": 0.8}))
+    scores = {"rec_a00001.wav": 0.8}
+    client = TestClient(create_app(recordings, labels, lambda p: scores.get(p.name)))
     items = client.get("/api/recordings").json()["items"]
     assert items[0] == {"file": "rec_a00001.wav", "score": 0.8, "label": None}
 
@@ -56,3 +57,15 @@ def test_index_page_is_served(recordings, tmp_path):
     client = TestClient(create_app(recordings, tmp_path / "labels.csv"))
     response = client.get("/")
     assert response.status_code == 200 and "labelowanie" in response.text
+
+
+def test_new_recordings_appear_and_index_scores_are_used(recordings, tmp_path):
+    client = TestClient(create_app(recordings, tmp_path / "labels.csv"))
+    assert len(client.get("/api/recordings").json()["items"]) == 2
+
+    (recordings / "cand_new.wav").write_bytes(b"RIFF")
+    (recordings / "candidates.csv").write_text(
+        "file,received_at,cat_score,detected,svm\ncand_new.wav,2026-11-19T10:00:00,0.61234,1,0\n")
+    items = {i["file"]: i for i in client.get("/api/recordings").json()["items"]}
+    assert items["cand_new.wav"]["score"] == 0.612
+    assert client.get("/audio/cand_new.wav").status_code == 200

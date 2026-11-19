@@ -148,6 +148,7 @@ async function load() {
   refresh();
   const firstUnlabeled = view.find((it) => !it.label) || view[0];
   if (firstUnlabeled) select(firstUnlabeled.file, false);
+  else $("hint").textContent = "Brak nagrań w katalogu — odśwież stronę, gdy serwer zbierze nowe.";
 }
 
 function scoreOf(it) { return it.score == null ? -1 : it.score; }
