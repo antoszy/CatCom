@@ -37,9 +37,10 @@ HOP_SIZE = 320
 # windowed_inference.py does for its last window.
 MIN_CLIP_S = 10.0
 
-# Not tuned on labelled data yet: pick it from the precision/recall curve
-# once recordings with logged scores have been labelled.
-DEFAULT_THRESHOLD = float(os.environ.get("CATCOM_THRESHOLD", "0.3"))
+# Chosen on 90 hand-labelled 0.45 s clips (old pipeline's positives, 56 cat /
+# 34 not cat): precision 0.98, recall 0.71. Favours few false alarms over
+# catching every meow. Re-check once 2 s clips have been labelled.
+DEFAULT_THRESHOLD = float(os.environ.get("CATCOM_THRESHOLD", "0.5"))
 
 
 def _sha256(path: Path) -> str:
