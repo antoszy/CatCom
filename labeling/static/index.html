@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kotofon — labelowanie nagrań</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --panel: #ffffff; --ink: #1d1b18; --muted: #6f6a61; --line: #e4dfd5;
+    --cat: #c2571a; --cat-bg: #fbe9dd; --not: #2f6b4f; --not-bg: #e1f0e8;
+    --unsure: #7a6a12; --unsure-bg: #f5eec8; --focus: #1d1b18;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--ink); height: 100vh; display: grid;
+         grid-template-columns: 320px 1fr; }
+  aside { border-right: 1px solid var(--line); background: var(--panel); display: flex;
+          flex-direction: column; min-height: 0; }
+  header.side { padding: 16px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 16px; margin: 0 0 10px; letter-spacing: .01em; }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--ink); width: 0; transition: width .2s; }
+  .counts { display: flex; gap: 10px; margin-top: 8px; color: var(--muted); font-size: 12px;
+            font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+  .controls { display: flex; gap: 6px; margin-top: 12px; }
+  select { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
+           background: var(--panel); color: var(--ink); flex: 1; }
+  ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center;
+       padding: 7px 16px; cursor: pointer; border-bottom: 1px solid #f1ede6;
+       font-variant-numeric: tabular-nums; }
+  li:hover { background: #faf8f4; }
+  li.active { background: #efe9dd; box-shadow: inset 3px 0 0 var(--focus); }
+  li .name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  li .score { color: var(--muted); font-size: 12px; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+  .badge.cat { background: var(--cat-bg); color: var(--cat); }
+  .badge.not_cat { background: var(--not-bg); color: var(--not); }
+  .badge.unsure { background: var(--unsure-bg); color: var(--unsure); }
+  .badge.none { color: #b5afa4; }
+
+  main { display: flex; flex-direction: column; align-items: center; justify-content: center;
+         padding: 32px; gap: 22px; min-width: 0; }
+  .card { width: min(760px, 100%); background: var(--panel); border: 1px solid var(--line);
+          border-radius: 14px; padding: 24px; }
+  .title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .title h2 { margin: 0; font: 600 18px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .meta { color: var(--muted); font-variant-numeric: tabular-nums; }
+  canvas { width: 100%; height: 140px; display: block; margin: 18px 0 6px; cursor: pointer;
+           border-radius: 8px; background: #faf8f4; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           padding: 10px 16px; border-radius: 10px; cursor: pointer; display: inline-flex;
+           align-items: center; gap: 8px; }
+  button:hover { border-color: #cfc7b8; }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button.lab { flex: 1; justify-content: center; font-weight: 600; padding: 14px; }
+  button.lab.cat { color: var(--cat); } button.lab.cat.on { background: var(--cat-bg); border-color: var(--cat); }
+  button.lab.not_cat { color: var(--not); } button.lab.not_cat.on { background: var(--not-bg); border-color: var(--not); }
+  button.lab.unsure { color: var(--unsure); } button.lab.unsure.on { background: var(--unsure-bg); border-color: var(--unsure); }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-bottom-width: 2px;
+        border-radius: 4px; padding: 0 5px; color: var(--muted); background: #fbfaf7; }
+  label.opt { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+  .keys { width: min(760px, 100%); color: var(--muted); font-size: 12px; display: flex; gap: 16px;
+          flex-wrap: wrap; justify-content: center; }
+  .done { color: var(--not); font-weight: 600; }
+  .error { color: #b3261e; }
+</style>
+</head>
+<body>
+<aside>
+  <header class="side">
+    <h1>Kotofon · labelowanie</h1>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="counts" id="counts"></div>
+    <div class="controls">
+      <select id="filter" aria-label="Filtr">
+        <option value="all">Wszystkie</option>
+        <option value="unlabeled">Nieoznaczone</option>
+        <option value="cat">Kot</option>
+        <option value="not_cat">Nie kot</option>
+        <option value="unsure">Niepewne</option>
+      </select>
+      <select id="sort" aria-label="Sortowanie">
+        <option value="name">Po nazwie</option>
+        <option value="score_desc">Wynik ↓</option>
+        <option value="score_asc">Wynik ↑</option>
+      </select>
+    </div>
+  </header>
+  <ul id="list"></ul>
+</aside>
+
+<main>
+  <section class="card" id="card">
+    <div class="title">
+      <h2 id="fname">—</h2>
+      <span class="meta" id="meta"></span>
+    </div>
+    <canvas id="wave" width="1400" height="280" title="Kliknij, aby odtworzyć"></canvas>
+    <div class="hint" id="hint">Ładowanie…</div>
+    <div class="row">
+      <button class="lab cat" data-label="cat">Kot <kbd>1</kbd></button>
+      <button class="lab not_cat" data-label="not_cat">Nie kot <kbd>2</kbd></button>
+      <button class="lab unsure" data-label="unsure">Niepewne <kbd>3</kbd></button>
+    </div>
+    <div class="row" style="justify-content: space-between; align-items: center;">
+      <div style="display:flex; gap:10px;">
+        <button id="prev">← Poprzednie</button>
+        <button id="play">▶ Odtwórz <kbd>spacja</kbd></button>
+        <button id="next">Następne →</button>
+      </div>
+      <div style="display:flex; gap:14px;">
+        <label class="opt"><input type="checkbox" id="autoplay" checked> autoodtwarzanie</label>
+        <label class="opt"><input type="checkbox" id="showScore" checked> wynik modelu</label>
+      </div>
+    </div>
+  </section>
+  <div class="keys">
+    <span><kbd>1</kbd>/<kbd>K</kbd> kot</span>
+    <span><kbd>2</kbd>/<kbd>N</kbd> nie kot</span>
+    <span><kbd>3</kbd>/<kbd>U</kbd> niepewne</span>
+    <span><kbd>⌫</kbd> usuń etykietę</span>
+    <span><kbd>←</kbd><kbd>→</kbd> nawigacja</span>
+    <span><kbd>spacja</kbd> odtwórz ponownie</span>
+  </div>
+</main>
+
+<script>
+const LABEL_TEXT = { cat: "kot", not_cat: "nie kot", unsure: "niepewne" };
+const KEY_TO_LABEL = { "1": "cat", k: "cat", "2": "not_cat", n: "not_cat", "3": "unsure", u: "unsure" };
+const $ = (id) => document.getElementById(id);
+
+let items = [];        // all recordings from the API
+let view = [];         // filtered + sorted
+let current = null;    // file name
+let labelsFile = "";
+const audio = new Audio();
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const waveCache = new Map();
+
+async function load() {
+  const res = await fetch("/api/recordings");
+  const data = await res.json();
+  items = data.items;
+  labelsFile = data.labels_file;
+  refresh();
+  const firstUnlabeled = view.find((it) => !it.label) || view[0];
+  if (firstUnlabeled) select(firstUnlabeled.file, false);
+}
+
+function scoreOf(it) { return it.score == null ? -1 : it.score; }
+
+function refresh() {
+  const filter = $("filter").value, sort = $("sort").value;
+  view = items.filter((it) =>
+    filter === "all" ? true : filter === "unlabeled" ? !it.label : it.label === filter);
+  if (sort === "score_desc") view.sort((a, b) => scoreOf(b) - scoreOf(a));
+  else if (sort === "score_asc") view.sort((a, b) => scoreOf(a) - scoreOf(b));
+  else view.sort((a, b) => a.file.localeCompare(b.file));
+  renderList();
+  renderCounts();
+}
+
+function renderCounts() {
+  const n = items.length, done = items.filter((it) => it.label).length;
+  const c = (l) => items.filter((it) => it.label === l).length;
+  $("bar").style.width = n ? `${(100 * done) / n}%` : "0";
+  $("counts").innerHTML =
+    `<span>${done}/${n} oznaczonych</span><span>kot ${c("cat")}</span>` +
+    `<span>nie kot ${c("not_cat")}</span><span>niepewne ${c("unsure")}</span>`;
+}
+
+function renderList() {
+  const showScore = $("showScore").checked;
+  const ul = $("list");
+  ul.innerHTML = "";
+  for (const it of view) {
+    const li = document.createElement("li");
+    li.dataset.file = it.file;
+    if (it.file === current) li.className = "active";
+    const badge = it.label
+      ? `<span class="badge ${it.label}">${LABEL_TEXT[it.label]}</span>`
+      : `<span class="badge none">—</span>`;
+    const score = showScore && it.score != null ? it.score.toFixed(2) : "";
+    li.innerHTML = `<span class="name">${it.file}</span><span class="score">${score}</span>${badge}`;
+    li.onclick = () => select(it.file, true);
+    ul.appendChild(li);
+  }
+  const active = ul.querySelector("li.active");
+  if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+function renderCard() {
+  const it = items.find((x) => x.file === current);
+  if (!it) return;
+  $("fname").textContent = it.file;
+  const parts = [];
+  if ($("showScore").checked && it.score != null) parts.push(`wynik modelu ${it.score.toFixed(3)}`);
+  $("meta").textContent = parts.join(" · ");
+  document.querySelectorAll("button.lab").forEach((b) =>
+    b.classList.toggle("on", b.dataset.label === it.label));
+  const remaining = items.filter((x) => !x.label).length;
+  $("hint").innerHTML = remaining
+    ? `Zostało ${remaining} nieoznaczonych · etykiety zapisują się do <code>${labelsFile}</code>`
+    : `<span class="done">Wszystko oznaczone.</span> Etykiety w <code>${labelsFile}</code>`;
+}
+
+async function select(file, play) {
+  current = file;
+  renderList();
+  renderCard();
+  audio.src = `/audio/${encodeURIComponent(file)}`;
+  drawWave(file);
+  if (play && $("autoplay").checked) playCurrent();
+}
+
+function playCurrent() {
+  audio.currentTime = 0;
+  audio.play().catch(() => {}); // autoplay can be blocked until first interaction
+}
+
+async function drawWave(file) {
+  const canvas = $("wave"), g = canvas.getContext("2d");
+  g.clearRect(0, 0, canvas.width, canvas.height);
+  try {
+    let samples = waveCache.get(file);
+    if (!samples) {
+      const buf = await (await fetch(`/audio/${encodeURIComponent(file)}`)).arrayBuffer();
+      samples = (await audioCtx.decodeAudioData(buf)).getChannelData(0);
+      waveCache.set(file, samples);
+    }
+    if (file !== current) return;
+    const w = canvas.width, h = canvas.height, mid = h / 2;
+    const step = Math.max(1, Math.floor(samples.length / w));
+    g.fillStyle = "#1d1b18";
+    for (let x = 0; x < w; x++) {
+      let min = 1, max = -1;
+      for (let i = x * step; i < (x + 1) * step && i < samples.length; i++) {
+        const v = samples[i]; if (v < min) min = v; if (v > max) max = v;
+      }
+      if (min > max) break;
+      g.fillRect(x, mid - max * mid, 1, Math.max(1, (max - min) * mid));
+    }
+    g.fillStyle = "#6f6a61";
+    g.font = "22px ui-monospace, monospace";
+    g.fillText(`${(samples.length / audioCtx.sampleRate).toFixed(2)} s`, 12, 30);
+  } catch (e) {
+    g.fillStyle = "#b3261e"; g.font = "24px sans-serif";
+    g.fillText("Nie udało się wczytać nagrania", 12, 36);
+  }
+}
+
+async function setLabel(label) {
+  const it = items.find((x) => x.file === current);
+  if (!it) return;
+  const res = await fetch(`/api/labels/${encodeURIComponent(it.file)}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label }),
+  });
+  if (!res.ok) { $("hint").innerHTML = `<span class="error">Błąd zapisu: ${res.status}</span>`; return; }
+  it.label = label;
+  const idx = view.findIndex((x) => x.file === it.file);
+  refresh();
+  if (label) advance(idx); else { renderList(); renderCard(); }
+}
+
+// After labelling go to the next unlabeled item at or after the old position.
+function advance(oldIdx) {
+  const after = view.slice(Math.max(0, oldIdx)).find((x) => !x.label && x.file !== current);
+  const next = after || view.find((x) => !x.label) ||
+               view[Math.min(oldIdx + 1, view.length - 1)];
+  if (next) select(next.file, true); else renderCard();
+}
+
+function move(delta) {
+  const idx = view.findIndex((x) => x.file === current);
+  const next = view[Math.min(view.length - 1, Math.max(0, idx + delta))];
+  if (next) select(next.file, true);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key.toLowerCase();
+  if (KEY_TO_LABEL[key]) { e.preventDefault(); setLabel(KEY_TO_LABEL[key]); }
+  else if (key === "backspace" || key === "delete") { e.preventDefault(); setLabel(null); }
+  else if (key === " ") { e.preventDefault(); playCurrent(); }
+  else if (key === "arrowright" || key === "arrowdown") { e.preventDefault(); move(1); }
+  else if (key === "arrowleft" || key === "arrowup") { e.preventDefault(); move(-1); }
+});
+document.querySelectorAll("button.lab").forEach((b) => (b.onclick = () => setLabel(b.dataset.label)));
+$("play").onclick = playCurrent;
+$("wave").onclick = playCurrent;
+$("prev").onclick = () => move(-1);
+$("next").onclick = () => move(1);
+$("filter").onchange = refresh;
+$("sort").onchange = refresh;
+$("showScore").onchange = () => { renderList(); renderCard(); };
+
+load().catch((e) => { $("hint").innerHTML = `<span class="error">Błąd: ${e}</span>`; });
+</script>
+</body>
+</html>

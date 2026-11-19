@@ -134,3 +134,6 @@ dmypy.json
 
 # Records
 rpi/records*
+
+# Recordings and labels (data, not code)
+data/
