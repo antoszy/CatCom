@@ -94,14 +94,16 @@ class StateRunning(State, ExitStack):
 
 
 class StateMachine:
-    def __init__(self, audio_rec, detector, rec_saver, cat_detector_client):
+    def __init__(self, audio_rec, detector, rec_saver, cat_detector_client,
+                 start_running=False):
         self.context = {
             "audio_rec": audio_rec,
             "detector": detector,
             "rec_saver": rec_saver,
             "cat_detector_client": cat_detector_client
         }
-        self.currentState = StateStandby(self.context)
+        initial_state = StateRunning if start_running else StateStandby
+        self.currentState = initial_state(self.context)
 
     def change_state(self):
         self.currentState = self.currentState.change(self.context)
