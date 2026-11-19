@@ -3,10 +3,18 @@ import time
 from datetime import datetime
 import numpy as np
 import utils.audio_utils as au
+from utils.ring_buffer import ChunkRingBuffer, chunks_for_duration
 import sys
 
 LOUD_TSH = 0.85
-REC_LENGTH = 6
+SAMPLE_RATE = 16000
+CHUNK_SIZE = 1024
+# Audio kept before the loud chunk, so the onset of a meow is not cut off.
+# The loud (trigger) chunk itself is part of the pre-roll.
+PRE_ROLL_S = 1.0
+# Audio recorded after the loud chunk. Pre + post roll (~2 s) gives YAMNet
+# (0.96 s window, 0.48 s hop) several full frames instead of one padded one.
+POST_ROLL_S = 1.0
 REC_FILE_NAME = "tmp.wav"
 
 
@@ -40,14 +48,27 @@ class StateRunning(State, ExitStack):
         super().__enter__()
         self.ctx = ctx
         self.audio_rec = self.enter_context(ctx["audio_rec"])
+        self.pre_roll = ChunkRingBuffer(
+            chunks_for_duration(PRE_ROLL_S, CHUNK_SIZE, SAMPLE_RATE))
+        self.post_roll_chunks = chunks_for_duration(POST_ROLL_S, CHUNK_SIZE, SAMPLE_RATE)
         print("Running state")
 
     def __del__(self):
         print("Exiting running state")
         self.audio_rec.stop_stream()
 
+    def _record_with_pre_roll(self) -> np.ndarray:
+        """Return pre-roll (incl. the trigger chunk) followed by freshly read post-roll."""
+        post_roll = [self.audio_rec.read_chank(CHUNK_SIZE)[1]
+                     for _ in range(self.post_roll_chunks)]
+        record = np.concatenate([self.pre_roll.to_array()] + post_roll).astype(np.int16)
+        # Next trigger must not reuse audio that has already been evaluated.
+        self.pre_roll.clear()
+        return record
+
     def run(self):
-        audio_chunk = self.audio_rec.read_chank()[1]
+        audio_chunk = self.audio_rec.read_chank(CHUNK_SIZE)[1]
+        self.pre_roll.append(audio_chunk)
         if au.check_threshold(audio_chunk, norm_tsh=LOUD_TSH):
             cat_detect = self.ctx["detector"].run_detection(audio_chunk)
             print(f"Loud audio detected at: {datetime.now().time()} " +
@@ -56,15 +77,12 @@ class StateRunning(State, ExitStack):
             if cat_detect:
                 # sys.stdout.write('\a')
                 sys.stdout.flush()
-                record = np.array(audio_chunk, dtype=np.int16)
-                for sample_num in range(0, REC_LENGTH):
-                    audio_chunk = self.audio_rec.read_chank()[1]
-                    record = np.append(record, audio_chunk)
+                record = self._record_with_pre_roll()
                 # Save temp record for sending to server
                 rec_path = self.ctx["rec_saver"].save(record, REC_FILE_NAME)
                 detector_server_response = self.ctx["cat_detector_client"].send_file(rec_path)
                 print(f"Detection server response: {detector_server_response}")
-                if detector_server_response["cat_meowing_detected"]:
+                if detector_server_response and detector_server_response["cat_meowing_detected"]:
                     print("Cat detected")
                     au.play_cat_sound()
                     # Save permanent record for verification by hand

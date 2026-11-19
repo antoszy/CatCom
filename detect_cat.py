@@ -9,7 +9,8 @@ import pickle
 
 DIRECTORY = "records_detector"
 MODEL_DIR = "models/svc.pickle"
-CAT_DETECTOR_SERVER_URL = "http://192.168.0.2:8981/upload/"
+# PC running neural_net/cat_detection_server.py (EfficientAT).
+CAT_DETECTOR_SERVER_URL = "http://192.168.0.4:8981/upload/"
 
 
 

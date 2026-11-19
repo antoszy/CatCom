@@ -1,0 +1,14 @@
+# Cat detection server (EfficientAT). CPU-only PyTorch wheels: a 2 s clip
+# through mn10_as is cheap enough on CPU, and CUDA wheels are ~10x larger.
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+torch==2.15.0+cpu
+torchaudio==2.11.1+cpu
+torchvision==0.29.2+cpu
+numpy==2.5.5
+fastapi==0.165.0
+uvicorn==0.54.0
+python-multipart==0.0.34
+pytest==9.2.0
+# Test-only: required by fastapi.testclient.TestClient
+httpx==0.28.1

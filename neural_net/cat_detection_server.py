@@ -1,43 +1,59 @@
-from model import CatDetector, load_wav_16k_mono_into_tensor
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
-import aiofiles
-import os
-import wave
+"""HTTP API used by the Raspberry Pi to confirm cat meows.
+
+Run: ``.venv/bin/uvicorn cat_detection_server:app --host 0.0.0.0 --port 8981``
+"""
+import logging
+from contextlib import asynccontextmanager
+from typing import Optional, Protocol, Tuple
+
+import numpy as np
+from fastapi import FastAPI, File, HTTPException, UploadFile
+
+from audio_io import InvalidAudioError, decode_wav
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("cat_detection_server")
 
 
-class CatDetectorAPI:
-    def __init__(self):
-        self.cat_detector = CatDetector()
-
-    async def upload_file(self, file: UploadFile = File(...)):
-        if not file.filename.endswith('.wav'):
-            return JSONResponse(content={"error": "Invalid file format"}, status_code=400)
-
-        # Read the uploaded file into memory
-        contents = await file.read()
-
-        # Convert the file contents to a tensor and resample
-        wav_tensor = load_wav_16k_mono_into_tensor(contents)
-
-        # Use the tensor to detect cat meows
-        is_cat_meowing = await self.cat_detector.detect_cat(wav_tensor)
-
-        if is_cat_meowing:
-            print("Cat meowing detected")
-        else:
-            print("No cat moewing detected")
-        
-        return {"cat_meowing_detected": is_cat_meowing}
+class Detector(Protocol):
+    def detect(self, waveform: np.ndarray, sample_rate: int) -> Tuple[bool, float]: ...
 
 
-# Initialize FastAPI app
-app = FastAPI()
+def create_app(detector: Optional[Detector] = None) -> FastAPI:
+    """Build the API. Without ``detector`` the EfficientAT model is loaded at startup."""
+    state = {"detector": detector}
 
-# Create an instance of the API handler
-api_handler = CatDetectorAPI()
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        if state["detector"] is None:
+            from cat_model import CatDetector  # heavy import (torch), only when serving
 
-# Define the route using the handler method
-@app.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
-    return await api_handler.upload_file(file)
+            state["detector"] = CatDetector()
+            logger.info("Model loaded")
+        yield
+
+    app = FastAPI(title="CatCom cat detection server", lifespan=lifespan)
+
+    @app.get("/health")
+    def health() -> dict:
+        return {"status": "ok", "model_loaded": state["detector"] is not None}
+
+    # Sync handler: FastAPI runs it in a thread pool, so CPU-bound inference
+    # does not block the event loop.
+    @app.post("/upload/")
+    def upload_file(file: UploadFile = File(...)) -> dict:
+        try:
+            waveform, sample_rate = decode_wav(file.file.read())
+        except InvalidAudioError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        is_cat_meowing, score = state["detector"].detect(waveform, sample_rate)
+        logger.info("%s: %.2f s, cat score %.3f -> %s", file.filename,
+                    waveform.size / sample_rate, score,
+                    "CAT" if is_cat_meowing else "no cat")
+        return {"cat_meowing_detected": bool(is_cat_meowing), "cat_score": float(score)}
+
+    return app
+
+
+app = create_app()

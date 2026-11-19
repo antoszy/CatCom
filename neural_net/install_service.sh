@@ -12,7 +12,9 @@ SERVICE_WORKING_DIRECTORY="$SCRIPT_PATH"
 
 # Create a systemd service file
 echo "[Unit]
-Description=Image Segmentation Service
+Description=CatCom cat detection server (EfficientAT)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 ExecStart=$SERVICE_PATH
