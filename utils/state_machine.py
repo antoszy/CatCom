@@ -4,7 +4,6 @@ from datetime import datetime
 import numpy as np
 import utils.audio_utils as au
 from utils.ring_buffer import ChunkRingBuffer, chunks_for_duration
-import sys
 
 LOUD_TSH = 0.85
 SAMPLE_RATE = 16000
@@ -15,7 +14,6 @@ PRE_ROLL_S = 1.0
 # Audio recorded after the loud chunk. Pre + post roll (~2 s) gives YAMNet
 # (0.96 s window, 0.48 s hop) several full frames instead of one padded one.
 POST_ROLL_S = 1.0
-REC_FILE_NAME = "tmp.wav"
 
 
 class State:
@@ -30,6 +28,7 @@ class StateStandby(State):
     def __init__(self, ctx):
         au.play_d_sound()
         print("Entering standby state")
+        ctx["clip_sender"].set_active(False)
         print("Standby state")
 
 
@@ -47,6 +46,7 @@ class StateRunning(State, ExitStack):
         super().__init__()
         super().__enter__()
         self.ctx = ctx
+        ctx["clip_sender"].set_active(True)
         self.audio_rec = self.enter_context(ctx["audio_rec"])
         self.pre_roll = ChunkRingBuffer(
             chunks_for_duration(PRE_ROLL_S, CHUNK_SIZE, SAMPLE_RATE))
@@ -68,30 +68,22 @@ class StateRunning(State, ExitStack):
 
     def run(self):
         audio_chunk = self.audio_rec.read_chank(CHUNK_SIZE)[1]
+        sender = self.ctx["clip_sender"]
+        if sender.is_muted():
+            # Our own alarm is playing: keep it out of the detector and of
+            # the pre-roll of the next clip.
+            self.pre_roll.clear()
+            return
         self.pre_roll.append(audio_chunk)
         if au.check_threshold(audio_chunk, norm_tsh=LOUD_TSH):
+            captured_at = sender.now()
             cat_detect = self.ctx["detector"].run_detection(audio_chunk)
             print(f"Loud audio detected at: {datetime.now().time()} " +
                   f"Detector output = {cat_detect[0]} " +
                   f"Max audio = {max(audio_chunk) / np.iinfo(audio_chunk.dtype).max}")
-            svm_says_cat = bool(cat_detect[0])
-            # The server alone decides about the alarm; the SVM verdict is only
-            # sent along for analysis. On 2026-11-20 the SVM rejected all 7 meows
-            # the server caught and flagged 50 non-cat sounds, so it can't gate.
-            # No server answer -> no alarm.
-            record = self._record_with_pre_roll()
-            rec_path = self.ctx["rec_saver"].save(record, REC_FILE_NAME)
-            detector_server_response = self.ctx["cat_detector_client"].send_file(
-                rec_path, metadata={"svm": str(int(svm_says_cat))})
-            print(f"Detection server response: {detector_server_response}")
-            sys.stdout.flush()
-            server_says_cat = bool(detector_server_response
-                                   and detector_server_response["cat_meowing_detected"])
-            if server_says_cat:
-                print("Cat detected")
-                au.play_cat_sound()
-                # Save permanent record for verification by hand
-                rec_path = self.ctx["rec_saver"].save(record)
+            # Sending and the alarm run in the sender's thread, so the
+            # microphone keeps being read while the server works.
+            sender.submit(self._record_with_pre_roll(), bool(cat_detect[0]), captured_at)
 
 
     def change(self, ctx):
@@ -99,13 +91,11 @@ class StateRunning(State, ExitStack):
 
 
 class StateMachine:
-    def __init__(self, audio_rec, detector, rec_saver, cat_detector_client,
-                 start_running=False):
+    def __init__(self, audio_rec, detector, clip_sender, start_running=False):
         self.context = {
             "audio_rec": audio_rec,
             "detector": detector,
-            "rec_saver": rec_saver,
-            "cat_detector_client": cat_detector_client
+            "clip_sender": clip_sender,
         }
         initial_state = StateRunning if start_running else StateStandby
         self.currentState = initial_state(self.context)

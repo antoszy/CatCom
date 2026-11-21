@@ -2,6 +2,7 @@ from rpi import rec_utils
 from rpi import pi_utils
 import utils.audio_utils as au
 from utils.state_machine import StateMachine
+from utils.clip_sender import ClipSender
 from utils.detector_client import CatDetectorClient
 
 from detector.detector import Detector
@@ -29,9 +30,9 @@ if __name__ == "__main__":
     with open(MODEL_DIR, "rb") as model_file:
         detector = Detector(pickle.load(model_file))
     audio_rec = rec_utils.AudioRecorder()
-    cat_detector_client = CatDetectorClient(CAT_DETECTOR_SERVER_URL)
-    state_machine = StateMachine(audio_rec, detector, rec_saver,
-                                 cat_detector_client,
+    clip_sender = ClipSender(CatDetectorClient(CAT_DETECTOR_SERVER_URL), rec_saver,
+                             play_alarm=au.play_cat_sound)
+    state_machine = StateMachine(audio_rec, detector, clip_sender,
                                  start_running=args.start_running)
     button = pi_utils.Button(4)
 

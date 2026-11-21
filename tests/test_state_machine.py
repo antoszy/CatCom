@@ -46,55 +46,59 @@ class FakeDetector:
         return np.array([self.verdict])
 
 
-class FakeSaver:
-    def __init__(self):
-        self.saved = []
+class FakeSender:
+    def __init__(self, muted=False):
+        self.muted = muted
+        self.submitted = []
+        self.active = []
 
-    def save(self, record, file_name=None):
-        self.saved.append((file_name, record.size))
-        return "/tmp/x.wav"
+    def now(self):
+        return 42.0
+
+    def is_muted(self):
+        return self.muted
+
+    def set_active(self, active):
+        self.active.append(active)
+
+    def submit(self, record, svm_says_cat, captured_at):
+        self.submitted.append((record.size, svm_says_cat, captured_at))
 
 
-class FakeClient:
-    def __init__(self, response):
-        self.response = response
-        self.sent = []
-
-    def send_file(self, path, metadata=None):
-        self.sent.append(metadata)
-        return self.response
+LOUD = np.full(1024, 32000, dtype=np.int16)
+QUIET = np.zeros(1024, dtype=np.int16)
 
 
-def run_once(sm, svm_verdict, server_response):
-    loud = np.full(1024, 32000, dtype=np.int16)
-    ctx = {"audio_rec": FakeRecorder([loud]), "detector": FakeDetector(svm_verdict),
-           "rec_saver": FakeSaver(), "cat_detector_client": FakeClient(server_response)}
-    state = sm.StateRunning(ctx)
+def make_state(sm, chunks, svm_verdict=0, sender=None):
+    ctx = {"audio_rec": FakeRecorder(chunks), "detector": FakeDetector(svm_verdict),
+           "clip_sender": sender or FakeSender()}
+    return sm.StateRunning(ctx), ctx["clip_sender"]
+
+
+@pytest.mark.parametrize("svm_verdict", [0, 1])
+def test_loud_chunk_submits_2s_clip_with_svm_verdict(sm, svm_verdict):
+    state, sender = make_state(sm, [LOUD], svm_verdict)
     state.run()
-    return ctx
+    # 1 s pre-roll (here only the trigger chunk) + 1 s post-roll
+    assert sender.submitted == [(1024 + 16 * 1024, bool(svm_verdict), 42.0)]
+    assert sender.active == [True]
 
 
-def test_server_verdict_alone_triggers_alarm_even_if_svm_rejects(sm):
-    ctx = run_once(sm, 0, {"cat_meowing_detected": True, "cat_score": 0.9})
-    assert ctx["cat_detector_client"].sent == [{"svm": "0"}]
-    assert sm.played == ["cat"]
+def test_quiet_chunk_submits_nothing(sm):
+    state, sender = make_state(sm, [QUIET])
+    state.run()
+    assert sender.submitted == []
 
 
-def test_no_alarm_when_server_says_no_cat_even_if_svm_says_cat(sm):
-    ctx = run_once(sm, 1, {"cat_meowing_detected": False, "cat_score": 0.01})
-    assert sm.played == []
-    assert [name for name, _ in ctx["rec_saver"].saved] == ["tmp.wav"]
+def test_muted_sender_ignores_loud_audio_and_clears_pre_roll(sm):
+    sender = FakeSender(muted=True)
+    state, _ = make_state(sm, [QUIET, LOUD], sender=sender)
+    state.run()
+    state.run()
+    assert sender.submitted == [] and len(state.pre_roll) == 0
 
 
-def test_alarm_when_svm_and_server_agree(sm):
-    ctx = run_once(sm, 1, {"cat_meowing_detected": True, "cat_score": 0.9})
-    assert ctx["cat_detector_client"].sent == [{"svm": "1"}]
-    assert sm.played == ["cat"]
-    # tmp clip for the server + permanent copy; ~2 s of audio (1 s pre + 1 s post roll)
-    assert [name for name, _ in ctx["rec_saver"].saved] == ["tmp.wav", None]
-    assert ctx["rec_saver"].saved[0][1] == 1024 + 16 * 1024
-
-
-def test_no_alarm_when_server_unavailable(sm):
-    run_once(sm, 1, None)
-    assert sm.played == []
+def test_standby_deactivates_sender(sm):
+    sender = FakeSender()
+    sm.StateStandby({"clip_sender": sender})
+    assert sender.active == [False]
