@@ -74,14 +74,25 @@ def test_storage_failure_does_not_break_detection(tmp_path):
     assert response.status_code == 200 and response.json()["cat_meowing_detected"] is True
 
 
-def test_upload_rejected_by_svm_is_not_stored(tmp_path):
+def test_low_score_clip_rejected_by_svm_is_not_stored(tmp_path):
     from candidate_store import CandidateStore
 
     store = CandidateStore(tmp_path)
     for svm in ("0", None):
         data = {} if svm is None else {"svm": svm}
-        with TestClient(create_app(FakeDetector((True, 0.9)), candidates=store)) as client:
+        with TestClient(create_app(FakeDetector((False, 0.049)), candidates=store)) as client:
             response = client.post("/upload/", files={"file": ("tmp.wav", wav_bytes(), "audio/wav")},
                                    data=data)
-        assert response.status_code == 200 and response.json()["cat_meowing_detected"] is True
+        assert response.status_code == 200
     assert list(tmp_path.glob("*")) == []
+
+
+def test_svm_rejected_clip_with_high_score_is_stored(tmp_path):
+    from candidate_store import CandidateStore
+
+    store = CandidateStore(tmp_path)
+    with TestClient(create_app(FakeDetector((False, 0.05)), candidates=store)) as client:
+        client.post("/upload/", files={"file": ("tmp.wav", wav_bytes(), "audio/wav")},
+                    data={"svm": "0"})
+    assert len(list(tmp_path.glob("cand_*.wav"))) == 1
+    assert "0.0500,0,0" in store.index_path.read_text()

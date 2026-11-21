@@ -75,9 +75,10 @@ class StateRunning(State, ExitStack):
                   f"Detector output = {cat_detect[0]} " +
                   f"Max audio = {max(audio_chunk) / np.iinfo(audio_chunk.dtype).max}")
             svm_says_cat = bool(cat_detect[0])
-            # Every loud event goes to the server, also when the SVM rejects it:
-            # the server stores all clips, so meows the SVM misses can be labelled.
-            # The alarm still requires both the SVM and the server to agree.
+            # The server alone decides about the alarm; the SVM verdict is only
+            # sent along for analysis. On 2026-11-20 the SVM rejected all 7 meows
+            # the server caught and flagged 50 non-cat sounds, so it can't gate.
+            # No server answer -> no alarm.
             record = self._record_with_pre_roll()
             rec_path = self.ctx["rec_saver"].save(record, REC_FILE_NAME)
             detector_server_response = self.ctx["cat_detector_client"].send_file(
@@ -86,7 +87,7 @@ class StateRunning(State, ExitStack):
             sys.stdout.flush()
             server_says_cat = bool(detector_server_response
                                    and detector_server_response["cat_meowing_detected"])
-            if svm_says_cat and server_says_cat:
+            if server_says_cat:
                 print("Cat detected")
                 au.play_cat_sound()
                 # Save permanent record for verification by hand

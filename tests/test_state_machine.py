@@ -74,9 +74,14 @@ def run_once(sm, svm_verdict, server_response):
     return ctx
 
 
-def test_svm_rejected_clip_is_still_sent_but_no_alarm(sm):
+def test_server_verdict_alone_triggers_alarm_even_if_svm_rejects(sm):
     ctx = run_once(sm, 0, {"cat_meowing_detected": True, "cat_score": 0.9})
     assert ctx["cat_detector_client"].sent == [{"svm": "0"}]
+    assert sm.played == ["cat"]
+
+
+def test_no_alarm_when_server_says_no_cat_even_if_svm_says_cat(sm):
+    ctx = run_once(sm, 1, {"cat_meowing_detected": False, "cat_score": 0.01})
     assert sm.played == []
     assert [name for name, _ in ctx["rec_saver"].saved] == ["tmp.wav"]
 

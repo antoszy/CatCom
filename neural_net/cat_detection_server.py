@@ -17,11 +17,14 @@ from candidate_store import CandidateStore
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("cat_detection_server")
 
-# Clips the Pi's SVM let through are kept here for labelling; set
-# CATCOM_CANDIDATES_DIR="" to disable.
+# Clips worth labelling are kept here; set CATCOM_CANDIDATES_DIR="" to disable.
 DEFAULT_CANDIDATES_DIR = os.environ.get(
     "CATCOM_CANDIDATES_DIR",
     str(Path(__file__).resolve().parent.parent / "data" / "candidates"))
+# A clip is stored when the Pi's SVM flagged it or its cat score reaches this.
+# Well below the alarm threshold, to keep near misses; background noise scores
+# under ~0.02.
+STORE_MIN_SCORE = 0.05
 
 
 class Detector(Protocol):
@@ -32,8 +35,8 @@ def create_app(detector: Optional[Detector] = None,
                candidates: Optional[CandidateStore] = None) -> FastAPI:
     """Build the API. Without ``detector`` the EfficientAT model is loaded at startup.
 
-    ``candidates`` stores clips the Pi's SVM let through (svm="1");
-    None disables storing.
+    ``candidates`` stores clips flagged by the Pi's SVM (svm="1") or scoring
+    at least ``STORE_MIN_SCORE``; None disables storing.
     """
     state = {"detector": detector}
 
@@ -67,9 +70,9 @@ def create_app(detector: Optional[Detector] = None,
         logger.info("%s: %.2f s, cat score %.3f -> %s", file.filename,
                     waveform.size / sample_rate, score,
                     "CAT" if is_cat_meowing else "no cat")
-        # Only SVM-positive clips are kept: everything louder than the gate
-        # arrives here, mostly background noise not worth the disk space.
-        if candidates is not None and svm == "1":
+        # Everything louder than the Pi's gate arrives here, mostly background
+        # noise. Keep what either model finds interesting.
+        if candidates is not None and (svm == "1" or score >= STORE_MIN_SCORE):
             try:
                 candidates.save(wav_bytes, score, is_cat_meowing, svm)
             except OSError:
